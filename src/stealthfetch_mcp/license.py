@@ -65,7 +65,7 @@ class LicenseManager:
             return 0
 
     def _has_pro(self, db: sqlite3.Connection, now: datetime) -> bool:
-        if not self.key or self.organization_id in {"", DEFAULT_POLAR_ORG_ID}:
+        if not self.key or self.organization_id in {"", "YOUR_POLAR_ORG_ID"}:
             return False
 
         fingerprint = hashlib.sha256(
