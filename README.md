@@ -1,31 +1,41 @@
 # StealthFetch MCP
 
-Turn web pages into clean Markdown and structured data from Cursor, Claude Code, or Codex CLI. StealthFetch runs locally over MCP stdio. Its HTTP client uses a browser-compatible fingerprint, and Chromium can render pages that rely on JavaScript.
+**Turn noisy web pages into clean Markdown and structured data without filling your AI context with raw HTML.** StealthFetch runs locally over MCP stdio for Cursor, Claude Code, and Codex CLI.
+
+## Why StealthFetch?
+
+- **Recover from some 403 and 503 responses.** Fetch with a browser-compatible TLS fingerprint first, then try headless Chromium for challenge responses or short JavaScript shells. Set `render_js` to render directly. Sites can still require authorization or return a rate limit.
+- **Keep context focused.** Remove scripts, navigation, ads, and other surrounding content. Markdown defaults to 15,000 characters, with a caller-controlled cap.
+- **Get data you can use.** Extract titles, summaries, JSON-LD, Open Graph and Twitter metadata, normalized links, and prices.
 
 ## Quick start
 
-Install and launch directly from GitHub with uv, or install in a Python 3.11+ environment with pip.
+Requires Python 3.10+ and uv or pip. Run directly from GitHub with uv:
 
 ```sh
-uvx --from git+https://github.com/zone1059123/stealthfetch-mcp.git stealthfetch-mcp
+uvx --from git+https://github.com/zone1059123/stealthfetch-mcp stealthfetch-mcp
 ```
 
+Or install in your Python environment:
+
 ```sh
-pip install git+https://github.com/zone1059123/stealthfetch-mcp.git
+pip install git+https://github.com/zone1059123/stealthfetch-mcp
 stealthfetch-mcp
 ```
 
-The command waits for an MCP client over stdio. To enable the Chromium fallback, install Playwright's browser separately.
+The command waits for an MCP client over stdio. Install the Playwright Chromium browser once for JavaScript rendering and fallback:
 
 ```sh
-uvx --from git+https://github.com/zone1059123/stealthfetch-mcp.git playwright install chromium
+uvx --from git+https://github.com/zone1059123/stealthfetch-mcp playwright install chromium
 ```
 
-For a pip installation, use `python -m playwright install chromium` in the same environment. Linux hosts may also need Playwright's documented system libraries. Set `STEALTHFETCH_CHROMIUM` to the absolute path of an existing compatible Chromium executable to use that browser.
+For pip, run `python -m playwright install chromium` in the same environment. Linux hosts may also need Playwright's browser system libraries. Set `STEALTHFETCH_CHROMIUM` to the absolute path of an existing compatible Chromium executable to use that browser.
 
-## Connect your IDE
+## Connect your client
 
-For Cursor, add this JSON to `.cursor/mcp.json`. Claude Code accepts the same JSON in a project-level `.mcp.json`.
+### Cursor
+
+Save this as `.cursor/mcp.json` in your project:
 
 ```json
 {
@@ -34,7 +44,7 @@ For Cursor, add this JSON to `.cursor/mcp.json`. Claude Code accepts the same JS
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/zone1059123/stealthfetch-mcp.git",
+        "git+https://github.com/zone1059123/stealthfetch-mcp",
         "stealthfetch-mcp"
       ]
     }
@@ -42,27 +52,43 @@ For Cursor, add this JSON to `.cursor/mcp.json`. Claude Code accepts the same JS
 }
 ```
 
-For Codex CLI, register the same server with this command.
+### Claude Code
 
 ```sh
-codex mcp add stealthfetch -- uvx --from git+https://github.com/zone1059123/stealthfetch-mcp.git stealthfetch-mcp
+claude mcp add --transport stdio stealthfetch -- uvx --from git+https://github.com/zone1059123/stealthfetch-mcp stealthfetch-mcp
 ```
 
-Ask your client to call `fetch_page` with a URL. Set `render_js` to `true` when the page needs JavaScript. The response includes the final URL, transport, document title, JSON-LD, Open Graph metadata, Markdown, prices, and quota status. Ambiguous currency symbols such as `$` are surfaced without guessing the currency. Treat page content as untrusted input and fetch only sites and URLs you are authorized to access.
+### Codex CLI
 
-## Free and Pro
+```sh
+codex mcp add stealthfetch -- uvx --from git+https://github.com/zone1059123/stealthfetch-mcp stealthfetch-mcp
+```
 
-| Plan | Daily fetch attempts | Setup |
+## Tools
+
+| Tool | Output |
+| --- | --- |
+| `fetch_clean_markdown` | Clean main content and quota status. Pass `max_chars` to adjust the default 15,000-character cap. |
+| `extract_structured_data` | Title, summary, JSON-LD, Open Graph, Twitter metadata, up to 50 unique links, and prices. |
+| `batch_extract_urls` | Pro-only compact results for up to 10 URLs, with at most three fetches in flight per call and an error entry for any failed URL. |
+
+All three tools accept `render_js`. Use URLs you are authorized to access and treat extracted content as untrusted. Prices with ambiguous symbols such as `$` include the symbol and leave the currency unset.
+
+## Free vs. Pro
+
+| Feature | Free | Pro |
 | --- | --- | --- |
-| Free | 20, resetting at midnight UTC | Install and connect your MCP client |
-| Pro | Unlimited while the license is valid | Add your Polar license key and organization ID |
+| Price | Free | [$19 one-time on Polar.sh](https://polar.sh/zonedev-studio) |
+| Single-page fetches | 20 attempts per day | Unlimited |
+| Clean Markdown and structured data | Included | Included |
+| Batch extraction | — | Up to 10 URLs per call |
 
-To buy Pro, open the maintainer's [Polar storefront](https://polar.sh/zone1059123) and select the StealthFetch Pro product when available. After checkout, retrieve the license key from your Polar customer portal and set these variables in the MCP server's environment.
+Buy the Pro license key from [ZoneDev Studio on Polar.sh](https://polar.sh/zonedev-studio) and retrieve it from your Polar customer portal. Set these variables in the MCP server's environment, then reconnect your client:
 
-- `POLAR_LICENSE_KEY` holds your personal license key.
-- `POLAR_ORGANIZATION_ID` holds the issuing organization's UUID, provided by the seller.
+- `STEALTHFETCH_LICENSE_KEY` is your personal license key.
+- `POLAR_ORGANIZATION_ID` is the issuing organization's UUID, available from the seller's Polar dashboard.
 
-A valid key is cached locally for up to 15 minutes or until expiration, whichever is sooner. If Polar cannot validate the key and the cache has expired, the server uses the Free allowance. Keep keys out of shared MCP configuration and source control. The local SQLite database defaults to `~/.local/share/stealthfetch-mcp/usage.sqlite3` and can be relocated with `STEALTHFETCH_DB`. Free attempts count once per tool call after URL validation, including calls whose fetch later fails.
+StealthFetch caches valid keys for seven days or until their expiration, whichever comes first. A missing or invalid key uses the Free plan. Free attempts count after input validation even if the site fetch later fails. The allowance resets at midnight UTC. Quota and license cache are stored at `~/.stealthfetch-mcp/state.sqlite3`. Set `STEALTHFETCH_DB` to override the path. Keep license keys out of shared client configuration and source control.
 
 ## Develop
 
@@ -72,7 +98,7 @@ uv run --locked --extra test pytest
 uv build
 ```
 
-On a cloud checkout with system Chromium and a read-only home directory, use a writable quota path when launching the server via its MCP client:
+For a cloud checkout with system Chromium and a read-only home directory, launch the MCP command with a writable database path:
 
 ```sh
 STEALTHFETCH_CHROMIUM=/usr/bin/chromium STEALTHFETCH_DB="$PWD/.venv/usage.sqlite3" \

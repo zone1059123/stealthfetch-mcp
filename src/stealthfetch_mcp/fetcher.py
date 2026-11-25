@@ -1,21 +1,14 @@
-"""HTTP fetching with a JavaScript-rendering fallback."""
+"""Asynchronous HTTP fetching and Chromium rendering."""
 
 import os
-from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from bs4 import BeautifulSoup
 from curl_cffi import requests
-from playwright.sync_api import Error as BrowserError
-from playwright.sync_api import sync_playwright
+from playwright.async_api import Error as BrowserError
+from playwright.async_api import async_playwright
 
 MAX_HTML_BYTES = 4 * 1024 * 1024
-
-
-@dataclass(frozen=True)
-class Page:
-    url: str
-    html: str
-    transport: str
 
 
 class FetchError(RuntimeError):
@@ -31,39 +24,53 @@ def validate_url(url: str) -> None:
     _ = parsed.port
 
 
-def _render(url: str) -> Page:
+def _is_shell(html: str) -> bool:
+    if not html.strip():
+        return True
+    soup = BeautifulSoup(html, "html.parser")
+    return len(soup.get_text(strip=True)) < 80 and (
+        len(html) < 512 or soup.find("script") is not None
+    )
+
+
+async def _render(url: str, timeout: int) -> dict:
     try:
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch(
                 executable_path=os.getenv("STEALTHFETCH_CHROMIUM") or None
             )
             try:
-                page = browser.new_page(accept_downloads=False)
-                response = page.goto(url, wait_until="load", timeout=25_000)
+                page = await browser.new_page(accept_downloads=False)
+                response = await page.goto(url, wait_until="networkidle", timeout=timeout * 1000)
                 if response is None or not response.ok:
                     status = response.status if response else "unknown"
-                    raise FetchError(f"Browser returned HTTP {status}.")
-                html = page.content()
+                    raise FetchError(f"Chromium returned HTTP {status}.")
+                html = await page.content()
                 if len(html.encode()) > MAX_HTML_BYTES:
-                    raise FetchError("Rendered page exceeds 4 MiB.")
-                return Page(page.url, html, "playwright")
+                    raise FetchError("Rendered HTML exceeds 4 MiB.")
+                return {"url": page.url, "html": html, "transport": "playwright"}
             finally:
-                browser.close()
+                await browser.close()
     except BrowserError as exc:
-        raise FetchError(
-            "Chromium rendering failed. Check the URL and Chromium installation."
-        ) from exc
+        if "Executable doesn't exist" in str(exc) or "Failed to launch chromium because executable" in str(exc):
+            raise FetchError(
+                "Chromium is unavailable. Run 'playwright install chromium' in the "
+                "server environment, or set STEALTHFETCH_CHROMIUM to a Chromium executable."
+            ) from exc
+        raise FetchError("Chromium could not render the page within the configured limits.") from exc
 
 
-def fetch(url: str, *, render_js: bool = False) -> Page:
-    """Fetch HTML over HTTP first, then render if necessary or requested."""
+async def fetch_html(url: str, render_js: bool = False, timeout: int = 20) -> dict:
+    """Fetch HTML with a browser fingerprint, then render challenges or short shells."""
     validate_url(url)
+    if timeout <= 0:
+        raise ValueError("timeout must be greater than zero.")
     if render_js:
-        return _render(url)
+        return await _render(url, timeout)
 
     try:
-        with requests.Session(impersonate="chrome") as session:
-            with session.stream("GET", url, timeout=15, max_redirects=5) as response:
+        async with requests.AsyncSession(impersonate="chrome") as session:
+            async with session.stream("GET", url, timeout=timeout, max_redirects=5) as response:
                 if response.status_code == 429:
                     raise FetchError("The site is rate limiting requests. Try again later.")
                 if response.status_code not in {403, 503}:
@@ -75,7 +82,7 @@ def fetch(url: str, *, render_js: bool = False) -> Page:
                     ):
                         raise FetchError("The URL did not return HTML.")
                     body = bytearray()
-                    for chunk in response.iter_content():
+                    async for chunk in response.aiter_content():
                         body.extend(chunk)
                         if len(body) > MAX_HTML_BYTES:
                             raise FetchError("HTML response exceeds 4 MiB.")
@@ -83,9 +90,9 @@ def fetch(url: str, *, render_js: bool = False) -> Page:
                         html = body.decode(response.encoding, errors="replace")
                     except LookupError:
                         html = body.decode("utf-8", errors="replace")
-                    if html.strip():
-                        return Page(response.url, html, "curl_cffi")
+                    if not _is_shell(html):
+                        return {"url": response.url, "html": html, "transport": "curl_cffi"}
     except requests.RequestsError:
         pass
 
-    return _render(url)
+    return await _render(url, timeout)

@@ -5,13 +5,16 @@ import os
 import sqlite3
 from contextlib import closing
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 
 FREE_DAILY_LIMIT = 20
-CACHE_SECONDS = 900
+CACHE_SECONDS = 7 * 24 * 60 * 60
+# Copy your organization ID from the Polar.sh dashboard.
+DEFAULT_POLAR_ORG_ID = "YOUR_POLAR_ORG_ID"
+UPGRADE_URL = "https://polar.sh/zonedev-studio"
 POLAR_VALIDATE = "https://api.polar.sh/v1/customer-portal/license-keys/validate"
 
 
@@ -30,12 +33,11 @@ class LicenseManager:
 
     @classmethod
     def from_environment(cls):
-        default = Path(os.getenv("XDG_DATA_HOME") or Path.home() / ".local/share")
-        path = os.getenv("STEALTHFETCH_DB") or default / "stealthfetch-mcp/usage.sqlite3"
+        path = os.getenv("STEALTHFETCH_DB") or Path.home() / ".stealthfetch-mcp/state.sqlite3"
         return cls(
             Path(path).expanduser(),
-            os.getenv("POLAR_LICENSE_KEY", ""),
-            os.getenv("POLAR_ORGANIZATION_ID", ""),
+            os.getenv("STEALTHFETCH_LICENSE_KEY", ""),
+            os.getenv("POLAR_ORGANIZATION_ID", DEFAULT_POLAR_ORG_ID),
         )
 
     def _verify(self, now: datetime) -> float:
@@ -52,7 +54,9 @@ class LicenseManager:
                 return 0
             expiry = now.timestamp() + CACHE_SECONDS
             if result.get("expires_at"):
-                license_expiry = datetime.fromisoformat(result["expires_at"])
+                if not isinstance(result["expires_at"], str):
+                    return 0
+                license_expiry = datetime.fromisoformat(result["expires_at"].replace("Z", "+00:00"))
                 if license_expiry.tzinfo is None:
                     return 0
                 expiry = min(expiry, license_expiry.timestamp())
@@ -61,7 +65,7 @@ class LicenseManager:
             return 0
 
     def _has_pro(self, db: sqlite3.Connection, now: datetime) -> bool:
-        if not self.key or not self.organization_id:
+        if not self.key or self.organization_id in {"", DEFAULT_POLAR_ORG_ID}:
             return False
 
         fingerprint = hashlib.sha256(
@@ -73,7 +77,7 @@ class LicenseManager:
         if row and row[0] > now.timestamp():
             return True
         expiry = self._verify(now)
-        if expiry <= datetime.now(UTC).timestamp():
+        if expiry <= datetime.now(timezone.utc).timestamp():
             return False
 
         with db:
@@ -82,7 +86,7 @@ class LicenseManager:
             )
         return True
 
-    def acquire(self) -> Access:
+    def acquire(self, *, pro_only: bool = False) -> Access:
         self.db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         with closing(sqlite3.connect(self.db_path, timeout=10)) as db:
             db.execute(
@@ -92,9 +96,11 @@ class LicenseManager:
                 "CREATE TABLE IF NOT EXISTS license_cache "
                 "(fingerprint TEXT PRIMARY KEY, valid_until REAL NOT NULL)"
             )
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             if self._has_pro(db, now):
                 return Access(True, "pro", None)
+            if pro_only:
+                return Access(False, "free", None)
 
             with db:
                 row = db.execute(
