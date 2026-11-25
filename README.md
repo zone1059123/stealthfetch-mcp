@@ -1,12 +1,12 @@
 # StealthFetch MCP
 
-**Turn noisy web pages into clean Markdown and structured data without filling your AI context with raw HTML.** StealthFetch runs locally over MCP stdio for Cursor, Claude Code, and Codex CLI.
+**A clean web content reader for Cursor, Claude Code, and Codex CLI.** StealthFetch runs locally over MCP stdio and turns web pages into token-efficient Markdown and structured data.
 
 ## Why StealthFetch?
 
-- **Recover from some 403 and 503 responses.** Fetch with a browser-compatible TLS fingerprint first, then try headless Chromium for challenge responses or short JavaScript shells. Set `render_js` to render directly. Sites can still require authorization or return a rate limit.
-- **Keep context focused.** Remove scripts, navigation, ads, and other surrounding content. Markdown defaults to 15,000 characters, with a caller-controlled cap.
-- **Get data you can use.** Extract titles, summaries, JSON-LD, Open Graph and Twitter metadata, normalized links, and prices.
+- **Headless JavaScript rendering.** StealthFetch starts with a browser-compatible HTTP request and can fall back to Chromium on HTTP 403, HTTP 503, or a short JavaScript shell. Use `render_js` to render a page directly.
+- **Token-efficient Markdown.** Remove scripts, navigation, ads, and other surrounding content. Markdown defaults to 15,000 characters, with a caller-controlled cap.
+- **JSON-LD and metadata extraction.** Extract titles, summaries, JSON-LD, Open Graph and Twitter metadata, normalized links, and prices.
 
 ## Quick start
 
@@ -78,12 +78,12 @@ All three tools accept `render_js`. Use URLs you are authorized to access and tr
 
 | Feature | Free | Pro |
 | --- | --- | --- |
-| Price | Free | [$19 one-time on Polar.sh](https://polar.sh/zonedev-studio) |
+| Price | Free | [$19 one-time on Polar.sh](https://buy.polar.sh/polar_cl_Vy3OoCLPPrdTfUPFqcRvLAwkJw70J82gMZlJS2sxJ8b) |
 | Single-page fetches | 20 attempts per day | Unlimited |
 | Clean Markdown and structured data | Included | Included |
 | Batch extraction | — | Up to 10 URLs per call |
 
-Buy the Pro license key from [ZoneDev Studio on Polar.sh](https://polar.sh/zonedev-studio) and retrieve it from your Polar customer portal. Set these variables in the MCP server's environment, then reconnect your client:
+Buy the Pro license key at [Polar Checkout](https://buy.polar.sh/polar_cl_Vy3OoCLPPrdTfUPFqcRvLAwkJw70J82gMZlJS2sxJ8b) and retrieve it from your Polar customer portal. Set these variables in the MCP server's environment, then reconnect your client:
 
 - `STEALTHFETCH_LICENSE_KEY` is your personal license key.
 - `POLAR_ORGANIZATION_ID` is the issuing organization's UUID, available from the seller's Polar dashboard.

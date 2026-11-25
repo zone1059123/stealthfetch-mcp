@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "stealthfetch-mcp"
 version = "0.1.0"
-description = "Local MCP server for web fetching and structured data extraction"
+description = "Clean web content reader with headless JS rendering and token-efficient Markdown and JSON-LD extraction"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"

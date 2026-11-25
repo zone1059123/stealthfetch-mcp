@@ -61,7 +61,7 @@ async def _render(url: str, timeout: int) -> dict:
 
 
 async def fetch_html(url: str, render_js: bool = False, timeout: int = 20) -> dict:
-    """Fetch HTML with a browser fingerprint, then render challenges or short shells."""
+    """Read HTML over HTTP with headless JavaScript rendering as a fallback."""
     validate_url(url)
     if timeout <= 0:
         raise ValueError("timeout must be greater than zero.")

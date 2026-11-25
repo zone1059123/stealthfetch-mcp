@@ -14,7 +14,7 @@ FREE_DAILY_LIMIT = 20
 CACHE_SECONDS = 7 * 24 * 60 * 60
 # Copy your organization ID from the Polar.sh dashboard.
 DEFAULT_POLAR_ORG_ID = "YOUR_POLAR_ORG_ID"
-UPGRADE_URL = "https://polar.sh/zonedev-studio"
+UPGRADE_URL = "https://buy.polar.sh/polar_cl_Vy3OoCLPPrdTfUPFqcRvLAwkJw70J82gMZlJS2sxJ8b"
 POLAR_VALIDATE = "https://api.polar.sh/v1/customer-portal/license-keys/validate"
 
 

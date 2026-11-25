@@ -1,4 +1,4 @@
-"""StealthFetch MCP tools and stdio entry point."""
+"""Clean web content reader and MCP stdio entry point."""
 
 import asyncio
 from typing import Any
@@ -40,9 +40,9 @@ async def _access(*, pro_only: bool = False) -> Access:
 async def fetch_clean_markdown(
     url: str, render_js: bool = False, max_chars: int = 15000
 ) -> dict[str, Any]:
-    """Fetch one HTTP(S) page and return the main content as clean Markdown.
+    """Read one HTTP(S) page and return its main content as token-efficient Markdown.
 
-    Set render_js for pages whose content relies on JavaScript. Set max_chars
+    Enable headless JavaScript rendering with render_js. Set max_chars
     to cap the Markdown size. Each request uses one daily fetch on the Free plan.
     """
     validate_url(url)
@@ -64,8 +64,9 @@ async def fetch_clean_markdown(
 async def extract_structured_data(url: str, render_js: bool = False) -> dict[str, Any]:
     """Extract JSON-LD, Open Graph, Twitter metadata, links, and prices from one URL.
 
-    Includes the page title and summary. Set render_js when the source data is
-    populated by JavaScript. Each request uses one daily fetch on the Free plan.
+    Includes the page title and summary. Enable headless rendering with
+    render_js when the source data is populated by JavaScript. Each request
+    uses one daily fetch on the Free plan.
     """
     validate_url(url)
     access = await _access()
@@ -86,8 +87,9 @@ async def batch_extract_urls(
 ) -> list[dict[str, Any]] | dict[str, Any]:
     """Extract titles, summaries, and prices for up to 10 URLs with a Pro license.
 
-    Runs at most three fetches concurrently per batch and preserves input
-    order. A failed URL produces an error entry while other URLs continue.
+    Processes up to three URLs concurrently and preserves input order. Set
+    render_js to enable headless rendering for the batch. A failed URL
+    produces an error entry while other URLs continue.
     """
     access = await _access(pro_only=True)
     if not access.allowed:

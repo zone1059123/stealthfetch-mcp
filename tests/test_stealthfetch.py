@@ -151,7 +151,7 @@ def test_upgrade_feedback_preserves_single_page_quota(tmp_path, monkeypatch):
         "plan": "Pro",
         "price_usd": 19,
         "billing": "one-time",
-        "url": "https://polar.sh/zonedev-studio",
+        "url": "https://buy.polar.sh/polar_cl_Vy3OoCLPPrdTfUPFqcRvLAwkJw70J82gMZlJS2sxJ8b",
     }
 
     manager = LicenseManager(db_path)
@@ -159,6 +159,9 @@ def test_upgrade_feedback_preserves_single_page_quota(tmp_path, monkeypatch):
         assert manager.acquire().allowed
     denied = asyncio.run(fetch_clean_markdown(URL))
     assert denied["error"]["code"] == "free_quota_exceeded"
+    assert denied["error"]["upgrade"]["url"] == (
+        "https://buy.polar.sh/polar_cl_Vy3OoCLPPrdTfUPFqcRvLAwkJw70J82gMZlJS2sxJ8b"
+    )
     assert denied["usage"]["remaining_today"] == 0
 
 
